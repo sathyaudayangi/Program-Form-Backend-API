@@ -1,13 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using ToDoTask.Models;
 using Microsoft.Azure.Cosmos;
-using ToDoTask.Services;
 using Microsoft.Azure.Cosmos.Linq;
-using System.ComponentModel;
 using System.Net;
 using Program_Form_Backend_API.Services;
+using Program_Form_Backend_API.Models;
 
-namespace ToDoTask.Controllers
+
+namespace Program_Form_Backend_API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
@@ -110,15 +109,14 @@ namespace ToDoTask.Controllers
             return Ok(questions);
         }
 
+        //Change question 
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateQuestion(string id, [FromBody] UpdateQuestion question)
         {
             try
             {
-                // Retrieve the item/document from the container based on the provided ID
                 ItemResponse<Question> response = await _dbService.QuestionContainer.ReadItemAsync<Question>(id, new PartitionKey(question.previousType.ToString()));
 
-                // Check if the question type is MultipleChoice
                 if (question.previousType == QuestionType.MultipleChoice)
                 {
                     MultipleChoiceQuestion multipleChoiceQuestion = new MultipleChoiceQuestion();
@@ -153,23 +151,21 @@ namespace ToDoTask.Controllers
             }
             catch (CosmosException ex)
             {
-                // Handle exceptions
                 return StatusCode((int)ex.StatusCode, ex.Message);
             }
         }
 
+        //Delete question
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteQuestion(string id, string type)
+        public async Task<IActionResult> DeleteQuestion(string id, QuestionType type)
         {
             try
             {
-                // Read the item to check if it exists
-                ItemResponse<Question> response = await _dbService.QuestionContainer.ReadItemAsync<Question>(id, new PartitionKey(type));
+                ItemResponse<Question> response = await _dbService.QuestionContainer.ReadItemAsync<Question>(id, new PartitionKey(type.ToString()));
 
-                // If the item exists, delete it
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
-                    await _dbService.QuestionContainer.DeleteItemAsync<Question>(id, new PartitionKey(type));
+                    await _dbService.QuestionContainer.DeleteItemAsync<Question>(id, new PartitionKey(type.ToString()));
                     return Ok("Question deleted successfully.");
                 }
                 else
@@ -179,12 +175,10 @@ namespace ToDoTask.Controllers
             }
             catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
             {
-                // Handle case when the item is not found
                 return NotFound("Question not found.");
             }
             catch (Exception ex)
             {
-                // Handle other exceptions
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
