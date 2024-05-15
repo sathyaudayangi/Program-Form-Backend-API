@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System.Runtime.Serialization;
 
-namespace Program_Form_Backend_API.Models
+namespace ToDoTask.Models
 {
     public enum QuestionType
     {
@@ -66,7 +66,7 @@ namespace Program_Form_Backend_API.Models
     public class UpdateQuestion
     {
         public string description { get; set; }
-        public QuestionType type { get; set; }
+        public QuestionType previousType { get; set; }
         public int maxChoise { get; set; }
         public List<string> choices { get; set; }
 

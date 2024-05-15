@@ -1,10 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using ToDoTask.Models;
 using Microsoft.Azure.Cosmos;
+using ToDoTask.Services;
 using Microsoft.Azure.Cosmos.Linq;
-using Program_Form_Backend_API.Models;
+using System.ComponentModel;
+using System.Net;
 using Program_Form_Backend_API.Services;
 
-namespace Program_Form_Backend_API.Controllers
+namespace ToDoTask.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
@@ -113,15 +116,14 @@ namespace Program_Form_Backend_API.Controllers
             try
             {
                 // Retrieve the item/document from the container based on the provided ID
-                ItemResponse<Question> response = await _dbService.QuestionContainer.ReadItemAsync<Question>(id, PartitionKey.Null);
+                ItemResponse<Question> response = await _dbService.QuestionContainer.ReadItemAsync<Question>(id, new PartitionKey(question.previousType.ToString()));
 
                 // Check if the question type is MultipleChoice
-                if (response.Resource.Type == QuestionType.MultipleChoice)
+                if (question.previousType == QuestionType.MultipleChoice)
                 {
                     MultipleChoiceQuestion multipleChoiceQuestion = new MultipleChoiceQuestion();
-                    multipleChoiceQuestion.Id = response.Resource.Id;
+                    multipleChoiceQuestion.Id = id;
                     multipleChoiceQuestion.ProgramId = response.Resource.ProgramId;
-                    multipleChoiceQuestion.Type = question.type;
                     multipleChoiceQuestion.Description = question.description;
                     multipleChoiceQuestion.Choices = question.choices;
                     multipleChoiceQuestion.MaxChoices = question.maxChoise;
@@ -129,13 +131,12 @@ namespace Program_Form_Backend_API.Controllers
                     await _dbService.QuestionContainer.ReplaceItemAsync(multipleChoiceQuestion, response.Resource.Id, new PartitionKey(multipleChoiceQuestion.QuestionType));
 
                 }
-                else if (response.Resource.Type == QuestionType.Dropdown)
+                else if (question.previousType == QuestionType.Dropdown)
                 {
                     DropdownQuestion dropdownQuestion = new DropdownQuestion();
-                    dropdownQuestion.Id = response.Resource.Id;
-                    dropdownQuestion.Type = question.type;
-                    dropdownQuestion.Description = question.description;
+                    dropdownQuestion.Id = id;
                     dropdownQuestion.ProgramId = response.Resource.ProgramId;
+                    dropdownQuestion.Description = question.description;
                     dropdownQuestion.Choices = question.choices;
 
                     await _dbService.QuestionContainer.ReplaceItemAsync(dropdownQuestion, response.Resource.Id, new PartitionKey(dropdownQuestion.QuestionType));
@@ -143,10 +144,10 @@ namespace Program_Form_Backend_API.Controllers
                 else
                 {
                     Question commonQuestion = new Question();
-                    commonQuestion.Id = response.Resource.Id;
-                    commonQuestion.Type = question.type;
+                    commonQuestion.Id = id;
+                    commonQuestion.ProgramId = response.Resource.ProgramId;
                     commonQuestion.Description = question.description;
-                    await _dbService.QuestionContainer.ReplaceItemAsync(question, response.Resource.Id, new PartitionKey(commonQuestion.QuestionType));
+                    await _dbService.QuestionContainer.ReplaceItemAsync(commonQuestion, response.Resource.Id, new PartitionKey(commonQuestion.QuestionType));
                 }
                 return Ok("Question updated successfully");
             }
@@ -154,6 +155,37 @@ namespace Program_Form_Backend_API.Controllers
             {
                 // Handle exceptions
                 return StatusCode((int)ex.StatusCode, ex.Message);
+            }
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteQuestion(string id, string type)
+        {
+            try
+            {
+                // Read the item to check if it exists
+                ItemResponse<Question> response = await _dbService.QuestionContainer.ReadItemAsync<Question>(id, new PartitionKey(type));
+
+                // If the item exists, delete it
+                if (response.StatusCode == HttpStatusCode.OK)
+                {
+                    await _dbService.QuestionContainer.DeleteItemAsync<Question>(id, new PartitionKey(type));
+                    return Ok("Question deleted successfully.");
+                }
+                else
+                {
+                    return NotFound("Question not found.");
+                }
+            }
+            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+            {
+                // Handle case when the item is not found
+                return NotFound("Question not found.");
+            }
+            catch (Exception ex)
+            {
+                // Handle other exceptions
+                return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
 
